@@ -15,7 +15,7 @@ python -m pip install torch==2.11.0 torchvision==0.26.0
 python -m pip install -r requirements.txt
 ```
 
-Intel Macでは、上のPyTorchのインストール行を `python -m pip install torch==2.2.2 torchvision==0.17.2` に置き換えます。CUDA 12.8版のPyTorchを使う環境では、Apple Silicon向けのPyTorchのインストール行に `--index-url https://download.pytorch.org/whl/cu128` を付けます。 [PyTorchの配布バージョン](https://pytorch.org/get-started/previous-versions/)
+Intel Macでは、上のPyTorchのインストール行を `python -m pip install torch==2.2.2 torchvision==0.17.2` に置き換えます。 [PyTorchの配布バージョン](https://pytorch.org/get-started/previous-versions/)
 
 ## データの配置
 
@@ -32,7 +32,7 @@ data/
         └── UW/
 ```
 
-## 解答手順
+## 学習と提出CSVの生成
 
 ```sh
 python reproduce.py
@@ -46,7 +46,7 @@ CPUを明示するには `python reproduce.py --device cpu` を実行します�
 
 元の実行では、検証F1が **0.86146** で、提出CSVは8,059行、陽性予測は156件でした。CSVのSHA-256は `150430e27aec276ac49e9ee20582e059ca21fe292f62f86a97e0eb2a32e0521e` です。デバイスやライブラリ、バッチサイズの違いにより、再学習時のスコアやCSVが変わる場合があります。
 
-## 創意工夫
+## 手法を選んだ理由
 
 生画像モデルの失敗例から、薄い縁や画像の端で切れたPコン跡を見逃し、小さな穴や欠けを誤検出することが分かりました。ハフ変換と円形度・輪郭の滑らかさを使うルールも検証しました。薄い跡や一部分しか見えない跡では輪郭の抽出が不安定で、欠けや小さな穴にも楕円が当てはまる例がありました。元写真単位の5分割検証で、試したルールベースの最高F1は0.677でした。
 
