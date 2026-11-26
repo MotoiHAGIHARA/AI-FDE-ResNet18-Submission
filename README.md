@@ -4,18 +4,15 @@ ResNet-18の3モデル等重み平均によるPコン跡判定の再現手順で
 
 ## 動作環境
 
-Python 3.10または3.11を使用します。Apple SiliconのMacでは利用可能な場合にMPSを使い、それ以外のMacではCPUで実行します。全15モデルを学習するため、所要時間は機器によって異なります。 [PyTorchのMPSの説明](https://docs.pytorch.org/docs/stable/notes/mps.html)
-
-Apple SiliconのMacでは、リポジトリ内で次を実行します。
+macOS 13以降とPython 3.10または3.11を使用します。Apple SiliconとIntel Macで手順は共通です。リポジトリ内で次を実行します。
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install torch==2.11.0 torchvision==0.26.0
 python -m pip install -r requirements.txt
 ```
 
-Intel Macでは、上のPyTorchのインストール行を `python -m pip install torch==2.2.2 torchvision==0.17.2` に置き換えます。 [PyTorchの配布バージョン](https://pytorch.org/get-started/previous-versions/)
+Apple Siliconでは利用可能な場合にMPSで学習し、それ以外のMacではCPUで学習します。
 
 ## データの配置
 
