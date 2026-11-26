@@ -36,9 +36,10 @@ def checkpoint_path(output, variant, fold):
     return output / variant / f"fold{fold}.pt"
 
 
-def load_state(path, variant, groups):
+def load_state(path, variant, groups=None):
     saved = torch.load(path, map_location="cpu", weights_only=True)
-    if (saved.get("architecture") != "resnet18" or saved.get("validation_groups") != groups or
+    if (saved.get("architecture") != "resnet18" or
+            (groups is not None and saved.get("validation_groups") != groups) or
             bool(saved.get("median_filter")) != (variant == "median") or
             saved.get("sharpen_amount", 0.0) != (0.5 if variant == "sharpen" else 0.0)):
         raise ValueError(f"{path}: checkpoint does not match the requested configuration")
@@ -137,6 +138,17 @@ def train_models(args, folds):
             subprocess.run([*base, "--variant", variant, "--fold", str(fold)], check=True)
 
 
+def fold_mean(scores):
+    mean = np.stack(scores).mean(axis=0)
+    # The original blend read each float32 test mean back from a CSV column.
+    return mean.astype(str).astype(np.float64)
+
+
+def ensemble_mean(scores):
+    raw, median, sharpen = scores
+    return (raw + median + sharpen) / 3
+
+
 def scores_for_variant(records, test_paths, folds, args, variant):
     oof, labels, test_scores = [], [], []
     test_records = [(path, 0) for path in test_paths]
@@ -154,9 +166,7 @@ def scores_for_variant(records, test_paths, folds, args, variant):
         test_batches = get_loader(args.images, test_records, variant, device, **loader_options)
         test_scores.append(predict_batches(model, test_batches, device, variant)[0])
         print(f"Scored {variant} {fold}/5", flush=True)
-    mean = np.stack(test_scores).mean(axis=0)
-    # The original blend read each float32 test mean back from a CSV column.
-    return np.concatenate(oof), mean.astype(str).astype(np.float64), np.asarray(labels)
+    return np.concatenate(oof), fold_mean(test_scores), np.asarray(labels)
 
 
 def write_submission(records, test_paths, folds, args):
@@ -165,8 +175,8 @@ def write_submission(records, test_paths, folds, args):
         valid_scores, test_scores, labels = scores_for_variant(records, test_paths, folds, args, variant)
         validation.append(valid_scores)
         test.append(test_scores)
-    scores = (validation[0] + validation[1] + validation[2]) / 3
-    mean = (test[0] + test[1] + test[2]) / 3
+    scores = ensemble_mean(validation)
+    mean = ensemble_mean(test)
     threshold, _, _, _ = best_f1(scores, labels)
     flags = mean >= threshold
 
@@ -198,6 +208,33 @@ def write_submission(records, test_paths, folds, args):
     print(f"Submission written to {file}")
 
 
+def classify_images(args):
+    metrics = args.output / "metrics.json"
+    if not metrics.is_file():
+        raise ValueError("Run `python reproduce.py` first to generate checkpoints and the decision threshold.")
+    threshold = float(json.loads(metrics.read_text(encoding="utf-8"))["threshold"])
+    if not 0 <= threshold <= 1:
+        raise ValueError(f"{metrics}: threshold must be between 0 and 1")
+    check_files(Path.cwd(), args.image_files)
+    records = [(path, 0) for path in args.image_files]
+    scores = []
+    for variant in VARIANTS:
+        batches = get_loader(Path.cwd(), records, variant, args.device, batch_size=args.batch_size,
+                             workers=args.workers, fit_to_tile=True)
+        folds = []
+        for fold in range(1, 6):
+            saved = load_state(checkpoint_path(args.output, variant, fold), variant)
+            model = build_model(args.device)
+            model.load_state_dict(saved["weights"])
+            folds.append(predict_batches(model, batches, args.device, variant)[0])
+        scores.append(fold_mean(folds))
+    probabilities = ensemble_mean(scores)
+    writer = csv.writer(sys.stdout, lineterminator="\n")
+    writer.writerow(("path", "score", "prediction"))
+    writer.writerows((str(path), score, int(score >= threshold))
+                     for path, score in zip(args.image_files, probabilities, strict=True))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("data"), help="directory of the contest manifests")
@@ -209,6 +246,8 @@ def main():
     modes = parser.add_subparsers(dest="mode")
     modes.add_parser("all", help="train all missing folds, then build the submission")
     modes.add_parser("predict", help="make the submission from locally trained checkpoints")
+    classify = modes.add_parser("classify", help="predict the label for image files")
+    classify.add_argument("image_files", metavar="IMAGE", type=Path, nargs="+")
     for name in ("train", "train-fold"):
         command = modes.add_parser(name, help="train ResNet-18 checkpoints")
         command.add_argument("--variant", choices=VARIANTS, required=name == "train-fold")
@@ -229,6 +268,12 @@ def main():
         parser.error("Batch size must be positive and workers nonnegative.")
     if args.device.type == "cpu":
         torch.set_num_threads(min(4, torch.get_num_threads()))
+    if args.mode == "classify":
+        try:
+            classify_images(args)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
+        return
     if args.mode != "train-fold":
         print(f"Device: {args.device}", flush=True)
     records = read_labels(args.data / "train_label.csv")

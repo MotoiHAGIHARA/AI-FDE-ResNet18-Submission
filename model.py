@@ -7,7 +7,7 @@ from pathlib import PurePosixPath
 
 import numpy as np
 import torch
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
@@ -104,11 +104,12 @@ def folds_from_labels(records):
 
 
 class WallTiles(Dataset):
-    def __init__(self, root, records, *, median, augment):
+    def __init__(self, root, records, *, median, augment, fit_to_tile=False):
         self.root = root
         self.records = records
         self.median = median
         self.augment = augment
+        self.fit_to_tile = fit_to_tile
 
     def __len__(self):
         return len(self.records)
@@ -116,9 +117,11 @@ class WallTiles(Dataset):
     def __getitem__(self, index):
         path, label = self.records[index]
         with Image.open(self.root / path) as stored:
-            if stored.size != (256, 256):
+            if stored.size != (256, 256) and not self.fit_to_tile:
                 raise ValueError(f"{path}: expected 256x256, got {stored.size}")
             image = stored.convert("RGB")
+        if image.size != (256, 256):
+            image = ImageOps.pad(image, (256, 256), method=Image.Resampling.BILINEAR, color=(128, 128, 128))
         if self.augment:
             rotation = random.choice((None, Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180,
                                       Image.Transpose.ROTATE_270))
@@ -136,8 +139,9 @@ class WallTiles(Dataset):
         return torch.from_numpy(pixels).permute(2, 0, 1), label
 
 
-def get_loader(images, records, variant, device, sampler=None, *, batch_size=32, workers=4):
-    return DataLoader(WallTiles(images, records, median=variant == "median", augment=sampler is not None),
+def get_loader(images, records, variant, device, sampler=None, *, batch_size=32, workers=4, fit_to_tile=False):
+    return DataLoader(WallTiles(images, records, median=variant == "median", augment=sampler is not None,
+                                fit_to_tile=fit_to_tile),
                       batch_size=batch_size, sampler=sampler, num_workers=workers, persistent_workers=workers > 0,
                       pin_memory=device.type == "cuda")
 
