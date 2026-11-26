@@ -38,8 +38,4 @@ data/
 python reproduce.py
 ```
 
-学習後、`outputs/submission_resnet18_raw_median_sharpen_aug.csv` が生成されます。CSVは `test.txt` の順序に従います。検証結果とCSVのSHA-256は `outputs/metrics.json` で確認できます。
-
-CPUを明示するには `python reproduce.py --device cpu` を実行します。画像の配置が異なる場合は、`--images` に `W/` を含むディレクトリを指定します。メモリに合わせてバッチサイズを下げる場合は、別の出力先を指定し、たとえば `python reproduce.py --batch-size 16 --output outputs-small-batch` を実行します。中断後に同じ設定で起動すると、完了済みの学習を再利用します。学習が完了している場合は `python reproduce.py predict` で推論だけを再実行できます。
-
-元の実行では、検証F1が **0.86146** で、提出CSVは8,059行、陽性予測は156件でした。CSVのSHA-256は `150430e27aec276ac49e9ee20582e059ca21fe292f62f86a97e0eb2a32e0521e` です。デバイスやライブラリ、バッチサイズの違いにより、再学習時のスコアやCSVが変わる場合があります。
+モデルを学習し、提出CSVを `outputs/submission_resnet18_raw_median_sharpen_aug.csv` に保存します。
