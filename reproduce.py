@@ -16,6 +16,7 @@ from torch import nn
 
 from model import (best_f1, build_model, check_files, folds_from_labels, get_loader, get_sampler, group_id,
                    predict_batches, preprocess, read_labels, read_test, training_plateau)
+import submission_weights
 
 
 VARIANTS = {"raw": 34, "median": 34, "sharpen": 45}
@@ -208,14 +209,17 @@ def write_submission(records, test_paths, folds, args):
     print(f"Submission written to {file}")
 
 
-def classify_images(args):
+def classify_images(args, *, use_release_if_missing):
+    check_files(Path.cwd(), args.image_files)
+    filenames = ["metrics.json", *(f"{variant}/fold{fold}.pt" for variant in VARIANTS for fold in range(1, 6))]
+    if use_release_if_missing:
+        args.output = submission_weights.fetch(Path("submission-weights"), filenames)
     metrics = args.output / "metrics.json"
     if not metrics.is_file():
         raise ValueError("Run `python reproduce.py` first to generate checkpoints and the decision threshold.")
     threshold = float(json.loads(metrics.read_text(encoding="utf-8"))["threshold"])
     if not 0 <= threshold <= 1:
         raise ValueError(f"{metrics}: threshold must be between 0 and 1")
-    check_files(Path.cwd(), args.image_files)
     records = [(path, 0) for path in args.image_files]
     scores = []
     for variant in VARIANTS:
@@ -239,7 +243,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("data"), help="directory of the contest manifests")
     parser.add_argument("--images", type=Path, help="directory containing W/ (default: DATA/SDNET2018)")
-    parser.add_argument("--output", type=Path, default=Path("outputs"), help="local output directory")
+    parser.add_argument("--output", type=Path, help="local output directory (default: outputs)")
     parser.add_argument("--device", choices=("auto", "mps", "cpu", "cuda"), default="auto")
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--workers", type=int, help="data loader workers (default: 4 for CUDA, 0 otherwise)")
@@ -253,6 +257,8 @@ def main():
         command.add_argument("--variant", choices=VARIANTS, required=name == "train-fold")
         command.add_argument("--fold", type=int, choices=range(1, 6), required=name == "train-fold")
     args = parser.parse_args()
+    default_output = args.output is None
+    args.output = args.output or Path("outputs")
     args.mode = args.mode or "all"
     args.images = args.images or args.data / "SDNET2018"
     if args.device == "auto":
@@ -270,7 +276,7 @@ def main():
         torch.set_num_threads(min(4, torch.get_num_threads()))
     if args.mode == "classify":
         try:
-            classify_images(args)
+            classify_images(args, use_release_if_missing=default_output)
         except (OSError, ValueError) as exc:
             parser.error(str(exc))
         return

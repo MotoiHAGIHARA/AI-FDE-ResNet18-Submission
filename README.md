@@ -39,11 +39,10 @@ python reproduce.py
 
 ## 学習済みの重みで推論する
 
-リポジトリ内で提出時の重みを展開し、壁面画像をCPUで判定します。
+リポジトリ内で画像ファイルを指定すると、CPUで判定します。
 
 ```sh
-curl -fL https://github.com/MotoiHAGIHARA/AI-FDE-ResNet18-Submission/releases/download/submission-weights-v1/resnet18-weights.tar.gz | tar -xz
-python reproduce.py --device cpu --output submission-weights classify wall.jpg
+python reproduce.py --device cpu classify wall.jpg
 ```
 
-スコアと判定（Pコン跡ありは `1`、なしは `0`）を表示します。256×256以外の画像は、縦横比を保って余白を足し、256×256にそろえます。
+初回は提出時の重み（約625 MB）を自動で取得します。スコアと判定（Pコン跡ありは `1`、なしは `0`）を表示します。
