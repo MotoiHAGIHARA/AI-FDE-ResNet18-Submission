@@ -37,12 +37,13 @@ python reproduce.py
 
 モデルを学習し、提出CSVを `outputs/submission_resnet18_raw_median_sharpen_aug.csv` に保存します。
 
-## 別の画像を判定する
+## 学習済みの重みで推論する
 
-学習で生成した重みが `outputs/` にあれば、壁面画像を直接指定して判定できます。CPUで実行する例です。
+リポジトリ内で提出時の重みを展開し、壁面画像をCPUで判定します。
 
 ```sh
-python reproduce.py --device cpu classify wall.jpg
+curl -fL https://github.com/MotoiHAGIHARA/AI-FDE-ResNet18-Submission/releases/download/submission-weights-v1/resnet18-weights.tar.gz | tar -xz
+python reproduce.py --device cpu --output submission-weights classify wall.jpg
 ```
 
 スコアと判定（Pコン跡ありは `1`、なしは `0`）を表示します。256×256以外の画像は、縦横比を保って余白を足し、256×256にそろえます。

@@ -1,5 +1,6 @@
 /data/
 /outputs/
+/submission-weights/
 /.venv/
 __pycache__/
 *.pt
@@ -8,3 +9,4 @@ __pycache__/
 *.jpg
 *.jpeg
 *.zip
+*.tar.gz
