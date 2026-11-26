@@ -1,0 +1,10 @@
+/data/
+/outputs/
+/.venv/
+__pycache__/
+*.pt
+*.pth
+*.csv
+*.jpg
+*.jpeg
+*.zip
